@@ -468,6 +468,7 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
   const [checkoutModal, setCheckoutModal] = useState(table.status === 'closing' && appUser.role === 'admin');
   const [cancelModalItem, setCancelModalItem] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
+  const [isMobileSheetOpen, setIsMobileSheetOpen] = useState(false);
 
   const isClosing = table.status === 'closing';
 
@@ -510,6 +511,7 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
     updateTable(table.id, { status: 'occupied', currentOrder: newOrder });
     setLocalOrder(newOrder);
     addToast(`${pendingItems.length} itens lançados na cozinha/copa!`, "success");
+    setIsMobileSheetOpen(false);
   };
 
   const handleInitiateCancel = (item) => {
@@ -534,7 +536,6 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
     const newTotal = newItems.reduce((acc, i) => acc + i.price, 0);
     const newOrder = { items: newItems, total: newTotal };
 
-    // Regra: se sobrar item, continua Ocupada/Fechamento. Se zerar, volta pra Livre.
     const nextTableStatus = newItems.length === 0 ? 'free' : (table.status === 'closing' ? 'closing' : 'occupied');
     const nextCurrentOrder = newItems.length === 0 ? null : newOrder;
 
@@ -554,7 +555,6 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
     setCancelModalItem(null);
     setCancelReason('');
     
-    // Se a mesa ficou livre (zerou), voltar pra tela inicial automaticamente
     if (nextTableStatus === 'free') onBack();
   };
 
@@ -574,7 +574,7 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
   const finalizePaymentAdmin = () => {
     if (appUser.role !== 'admin') return;
 
-    const totalComTaxa = localOrder.total * 1.1; // +10%
+    const totalComTaxa = localOrder.total * 1.1;
 
     addSale({
       id: Date.now().toString(),
@@ -595,7 +595,7 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
   const pendingCount = localOrder.items.filter(i => i.status === 'pending').length;
 
   return (
-    <div className="flex flex-col md:flex-row h-full w-full bg-gray-50 relative">
+    <div className="flex flex-col md:flex-row h-full w-full bg-gray-50 relative overflow-hidden">
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
         <div className="p-3 sm:p-4 bg-white border-b flex items-center gap-3 shadow-sm z-10 shrink-0">
           <button onClick={() => { if (menuPath.length > 0) setMenuPath(prev => prev.slice(0, -1)); else onBack(); }} className="p-2 sm:p-3 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
@@ -616,7 +616,7 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
         </div>
         
         <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-gray-100">
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 pb-[300px] md:pb-10">
+          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 pb-24 md:pb-10">
             {menuPath.length < 2 ? (
               getCurrentMenuLevel().map(cat => (
                 <button
@@ -652,17 +652,47 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
         </div>
       </div>
 
-      <div className="w-full md:w-96 bg-white flex flex-col fixed bottom-0 left-0 right-0 md:relative h-[55vh] md:h-full border-t-2 md:border-t-0 md:border-l shadow-[0_-15px_40px_-15px_rgba(0,0,0,0.3)] md:shadow-none z-20 transition-all duration-300 rounded-t-3xl md:rounded-none">
-        <div className="p-4 bg-gray-900 text-white flex justify-between items-center shrink-0 md:rounded-none rounded-t-3xl">
-          <h3 className="font-black uppercase tracking-wider text-sm flex items-center gap-2">
-            <FileText size={18} className="text-blue-400"/> Comanda
-          </h3>
-          <span className="bg-white/10 px-3 py-1.5 rounded-xl font-black text-lg">R$ {localOrder.total.toFixed(2)}</span>
+      {/* OVERLAY ESCURO PARA CELULAR CUANDO A COMANDA ESTÁ ABERTA */}
+      {isMobileSheetOpen && (
+        <div 
+          onClick={() => setIsMobileSheetOpen(false)}
+          className="fixed inset-0 bg-black/50 z-20 md:hidden animate-fade-in backdrop-blur-xs"
+        />
+      )}
+
+      {/* COMANDA COM GAVETA DESLIZANTE NO MOBILE */}
+      <div className={`w-full md:w-96 bg-white flex flex-col fixed md:relative bottom-0 left-0 right-0 z-30 transition-all duration-300 ease-in-out md:translate-y-0 rounded-t-3xl md:rounded-none md:h-full shadow-[0_-10px_30px_rgba(0,0,0,0.2)] md:shadow-none ${
+        isMobileSheetOpen ? 'h-[80vh] translate-y-0' : 'h-16 translate-y-0 md:h-full'
+      }`}>
+        {/* CABEÇALHO DA COMANDA (CLICÁVEL NO CELULAR PARA ABRIR/FECHAR) */}
+        <div 
+          onClick={() => setIsMobileSheetOpen(prev => !prev)}
+          className="p-4 bg-gray-900 text-white flex justify-between items-center shrink-0 rounded-t-3xl md:rounded-none cursor-pointer select-none"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-1 bg-gray-600 rounded-full absolute top-2 left-1/2 -translate-x-1/2 md:hidden" />
+            <FileText size={18} className="text-blue-400"/>
+            <h3 className="font-black uppercase tracking-wider text-sm">Comanda</h3>
+            {localOrder.items.length > 0 && (
+              <span className="bg-blue-600 text-white text-xs font-black px-2 py-0.5 rounded-full ml-1">
+                {localOrder.items.length}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="bg-white/10 px-3 py-1.5 rounded-xl font-black text-lg">
+              R$ {localOrder.total.toFixed(2)}
+            </span>
+            <button className="md:hidden text-gray-400 hover:text-white p-1">
+              <ChevronRight size={20} className={`transform transition-transform ${isMobileSheetOpen ? 'rotate-90' : '-rotate-90'}`} />
+            </button>
+          </div>
         </div>
         
+        {/* CORPO DA COMANDA */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
            {localOrder.items.length === 0 ? (
-             <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3 opacity-50">
+             <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3 opacity-50 py-8">
                <FileText size={48} />
                <p className="font-bold text-sm">Comanda Vazia</p>
              </div>
@@ -674,7 +704,7 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
                       <p className="font-black text-gray-900 text-sm sm:text-base leading-tight">{item.name}</p>
                       <p className="text-green-600 font-black text-sm mt-1">R$ {item.price.toFixed(2)}</p>
                     </div>
-                    <button onClick={() => handleInitiateCancel(item)} className="p-2.5 text-red-500 bg-red-50 hover:bg-red-100 active:bg-red-200 rounded-xl transition-colors" title="Cancelar Item">
+                    <button onClick={(e) => { e.stopPropagation(); handleInitiateCancel(item); }} className="p-2.5 text-red-500 bg-red-50 hover:bg-red-100 active:bg-red-200 rounded-xl transition-colors" title="Cancelar Item">
                       <Trash2 size={18} />
                     </button>
                   </div>
@@ -687,6 +717,7 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
            )}
         </div>
 
+        {/* RODAPÉ E BOTÕES DE AÇÃO */}
         <div className="p-4 bg-white border-t border-gray-100 shrink-0 pb-safe">
           {pendingCount > 0 ? (
             <button onClick={saveOrder} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-200 flex items-center justify-center gap-2 hover:bg-blue-700 active:scale-95 transition-all text-base sm:text-lg">
