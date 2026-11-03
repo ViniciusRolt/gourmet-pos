@@ -275,15 +275,13 @@ function AdminDashboard({ tables, outOfStockItems, appUser, addToast, sales, can
 
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const startOf3Months = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()).getTime();
-  const startOf1Year = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).getTime();
 
   const safeSales = Array.isArray(sales) ? sales : [];
   const safeCancellations = Array.isArray(cancellations) ? cancellations : [];
 
   const salesToday = safeSales.filter(s => (s.timestamp || 0) >= startOfDay).reduce((acc, s) => acc + (s.amount || 0), 0);
-  const sales3Months = safeSales.filter(s => (s.timestamp || 0) >= startOf3Months).reduce((acc, s) => acc + (s.amount || 0), 0);
-  const salesYear = safeSales.filter(s => (s.timestamp || 0) >= startOf1Year).reduce((acc, s) => acc + (s.amount || 0), 0);
+  const cancelamentosHoje = safeCancellations.filter(c => (c.timestamp || 0) >= startOfDay).reduce((acc, c) => acc + (c.price || 0), 0);
+  const totalCancelado = safeCancellations.reduce((acc, c) => acc + (c.price || 0), 0);
   const ticketMedio = safeSales.length > 0 ? (safeSales.reduce((acc, s) => acc + (s.amount || 0), 0) / safeSales.length) : 0;
 
   const statsPorGarcom = {};
@@ -352,13 +350,13 @@ function AdminDashboard({ tables, outOfStockItems, appUser, addToast, sales, can
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Vendas Hoje</p>
                 <p className="text-3xl font-black text-gray-900 mt-1">R$ {salesToday.toFixed(2)}</p>
               </div>
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Últimos 3 Meses</p>
-                <p className="text-3xl font-black text-gray-900 mt-1">R$ {sales3Months.toFixed(2)}</p>
+              <div className="bg-red-50 p-6 rounded-2xl shadow-sm border border-red-100">
+                <p className="text-xs font-bold text-red-500 uppercase tracking-wider">Cancelado Hoje</p>
+                <p className="text-3xl font-black text-red-700 mt-1">R$ {cancelamentosHoje.toFixed(2)}</p>
               </div>
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Último 1 Ano</p>
-                <p className="text-3xl font-black text-gray-900 mt-1">R$ {salesYear.toFixed(2)}</p>
+              <div className="bg-red-50 p-6 rounded-2xl shadow-sm border border-red-100">
+                <p className="text-xs font-bold text-red-500 uppercase tracking-wider">Total Cancelado</p>
+                <p className="text-3xl font-black text-red-700 mt-1">R$ {totalCancelado.toFixed(2)}</p>
               </div>
               <div className="bg-blue-600 p-6 rounded-2xl shadow-md sm:col-span-3 text-white flex items-center justify-between">
                 <div>
