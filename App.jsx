@@ -62,8 +62,8 @@ export default function RestaurantApp() {
   // Estado Local (Simulando Banco de Dados para o Deploy Rápido)
   const [employees, setEmployees] = useState([
     { id: 'admin1', name: 'Dono (Admin)', role: 'admin', pin: '0000' },
-    { id: 'waiter1', name: 'João (Garçom)', role: 'waiter', pin: '1234' },
-    { id: 'waiter2', name: 'Maria (Garçom)', role: 'waiter', pin: '5678' }
+    { id: 'waiter1', name: 'Lari (Garçom)', role: 'waiter', pin: '1234' },
+    { id: 'waiter2', name: 'Gusta (Garçom)', role: 'waiter', pin: '5678' }
   ]);
   const [tables, setTables] = useState(
     Array.from({ length: 12 }, (_, i) => ({ id: `mesa_${i+1}`, number: i+1, status: 'free', currentOrder: null }))
@@ -88,7 +88,7 @@ export default function RestaurantApp() {
   const toggleStock = (itemId, isOut) => setOutOfStockItems(prev => ({ ...prev, [itemId]: isOut }));
 
   return (
-    <div className="h-screen w-full flex flex-col bg-gray-100 overflow-hidden font-sans">
+    <div className="fixed inset-0 w-full flex flex-col bg-gray-100 overflow-hidden font-sans">
       <ToastContainer toasts={toasts} removeToast={id => setToasts(prev => prev.filter(t => t.id !== id))} />
       
       {!appUser ? (
@@ -181,8 +181,8 @@ function LoginScreen({ employees, onLogin }) {
 // --- LAYOUT PRINCIPAL ---
 function MainLayout({ appUser, onLogout, children }) {
   return (
-    <div className="h-full flex flex-col relative overflow-hidden bg-gray-100">
-      <header className="bg-gray-900 text-white p-4 flex justify-between items-center shadow-md z-10 shrink-0">
+    <div className="flex-1 w-full flex flex-col relative overflow-hidden bg-gray-100">
+      <header className="bg-gray-900 text-white p-4 flex justify-between items-center shadow-md z-20 shrink-0">
         <div className="flex items-center gap-2">
           <div className="bg-blue-500 p-1.5 rounded-lg"><Utensils size={18} className="text-white"/></div>
           <div>
@@ -304,7 +304,7 @@ function AdminDashboard({ tables, outOfStockItems, appUser, addToast, sales, can
   });
 
   return (
-    <div className="flex flex-col md:flex-row h-full overflow-hidden bg-gray-100">
+    <div className="flex-1 w-full flex flex-col md:flex-row overflow-hidden bg-gray-100">
       <div className="bg-gray-900 flex md:flex-col overflow-x-auto md:overflow-y-auto md:w-64 shrink-0 shadow-xl z-10 border-t border-gray-800 hide-scrollbar">
         <button onClick={() => setActiveTab('mesas')} className={`flex items-center gap-3 p-4 hover:bg-gray-800 font-bold whitespace-nowrap transition-colors ${activeTab === 'mesas' ? 'bg-gray-800 text-blue-400 md:border-l-4 border-b-4 md:border-b-0 border-blue-500' : 'text-gray-400'}`}>
           <Utensils size={20}/> Salão / Caixa
@@ -595,8 +595,8 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
   const pendingCount = localOrder.items.filter(i => i.status === 'pending').length;
 
   return (
-    <div className="flex flex-col md:flex-row h-full w-full bg-gray-50 relative overflow-hidden">
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+    <div className="flex-1 w-full flex flex-col md:flex-row bg-gray-50 relative overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden relative">
         <div className="p-3 sm:p-4 bg-white border-b flex items-center gap-3 shadow-sm z-10 shrink-0">
           <button onClick={() => { if (menuPath.length > 0) setMenuPath(prev => prev.slice(0, -1)); else onBack(); }} className="p-2 sm:p-3 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
             <ArrowLeft size={20} className="text-gray-700"/>
