@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import ReactDOM from 'react-dom/client';
 import { 
   Utensils, Wine, ChevronRight, ArrowLeft, Check, 
   Users, LogOut, FileText, Trash2, AlertCircle, Package, Lock, BarChart3, X, RotateCcw 
@@ -769,3 +770,10 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
     </div>
   );
 }
+
+// Renderização Principal do React
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <RestaurantApp />
+  </React.StrictMode>
+);
