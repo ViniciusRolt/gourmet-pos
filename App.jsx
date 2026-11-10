@@ -2,11 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import ReactDOM from 'react-dom/client';
 import { 
   Utensils, Wine, ChevronRight, ArrowLeft, Check, 
-  Users, LogOut, FileText, Trash2, AlertCircle, Package, Lock, BarChart3, X, RotateCcw 
+  Users, LogOut, FileText, Trash2, AlertCircle, Package, BarChart3, RotateCcw,
+  UserPlus, BookOpen, Plus
 } from 'lucide-react';
 
-// --- CARDÁPIO COMPLETO ---
-const MENU = {
+// --- CARDÁPIO INICIAL (Agora pode ser editado pelo Admin) ---
+const INITIAL_MENU = {
   Comida: {
     Carnes: [
       { id: 'c1', name: 'Bife Acebolado', price: 35 },
@@ -59,7 +60,8 @@ const ToastContainer = ({ toasts, removeToast }) => (
 export default function RestaurantApp() {
   const [appUser, setAppUser] = useState(null);
   
-  // Estado Local (Simulando Banco de Dados para o Deploy Rápido)
+  // Estado Local (Simulando Banco de Dados)
+  const [menu, setMenu] = useState(INITIAL_MENU);
   const [employees, setEmployees] = useState([
     { id: 'admin1', name: 'Dono (Admin)', role: 'admin', pin: '0000' },
     { id: 'waiter1', name: 'Lari (Garçom)', role: 'waiter', pin: '1234' },
@@ -100,11 +102,12 @@ export default function RestaurantApp() {
               tables={tables} outOfStockItems={outOfStockItems} appUser={appUser} 
               addToast={addToast} sales={sales} cancellations={cancellations}
               updateTable={updateTable} addSale={addSale} addCancellation={addCancellation} toggleStock={toggleStock}
+              menu={menu} setMenu={setMenu} employees={employees} setEmployees={setEmployees}
             />
           ) : (
             <WaiterDashboard 
               tables={tables} outOfStockItems={outOfStockItems} appUser={appUser} addToast={addToast}
-              updateTable={updateTable} addCancellation={addCancellation}
+              updateTable={updateTable} addCancellation={addCancellation} menu={menu}
             />
           )}
         </MainLayout>
@@ -130,8 +133,8 @@ function LoginScreen({ employees, onLogin }) {
   useEffect(() => { if (pin.length === 4 && selectedEmp) handleLoginSubmit(); }, [pin]);
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 p-6">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
+    <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 p-6 overflow-y-auto">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-8 border border-gray-100 my-auto">
         <div className="flex items-center justify-center gap-3 mb-8">
           <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center rotate-3">
             <Utensils className="text-white" size={24} />
@@ -140,7 +143,7 @@ function LoginScreen({ employees, onLogin }) {
         </div>
 
         {!selectedEmp ? (
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 hide-scrollbar">
             <p className="text-center font-bold text-gray-500 mb-6 uppercase text-sm tracking-wider">Selecione seu Perfil</p>
             {employees.map(emp => (
               <button key={emp.id} onClick={() => { setSelectedEmp(emp); setError(''); setPin(''); }} className="w-full flex items-center justify-between p-4 rounded-xl border-2 border-gray-100 hover:border-blue-500 hover:bg-blue-50 text-left transition-colors">
@@ -206,13 +209,14 @@ function MainLayout({ appUser, onLogout, children }) {
 }
 
 // --- PAINEL DO GARÇOM ---
-function WaiterDashboard({ appUser, tables, outOfStockItems, addToast, updateTable, addCancellation }) {
+function WaiterDashboard({ appUser, tables, outOfStockItems, addToast, updateTable, addCancellation, menu }) {
   const [activeTable, setActiveTable] = useState(null);
 
   if (activeTable) {
     return <TableOrderView 
       table={activeTable} appUser={appUser} onBack={() => setActiveTable(null)} 
       outOfStockItems={outOfStockItems} addToast={addToast} updateTable={updateTable} addCancellation={addCancellation}
+      menu={menu}
     />;
   }
 
@@ -261,15 +265,19 @@ function WaiterDashboard({ appUser, tables, outOfStockItems, addToast, updateTab
 }
 
 // --- PAINEL DO ADMIN ---
-function AdminDashboard({ tables, outOfStockItems, appUser, addToast, sales, cancellations, updateTable, addSale, addCancellation, toggleStock }) {
+function AdminDashboard({ tables, outOfStockItems, appUser, addToast, sales, cancellations, updateTable, addSale, addCancellation, toggleStock, menu, setMenu, employees, setEmployees }) {
   const [activeTab, setActiveTab] = useState('mesas');
   const [activeTable, setActiveTable] = useState(null);
+
+  // Estados dos novos formulários
+  const [newEmp, setNewEmp] = useState({ name: '', pin: '', role: 'waiter' });
+  const [newMenuItem, setNewMenuItem] = useState({ name: '', price: '', category: 'Comida', subcategory: '' });
 
   if (activeTable) {
     return <TableOrderView 
       table={activeTable} appUser={appUser} onBack={() => setActiveTable(null)} 
       outOfStockItems={outOfStockItems} addToast={addToast} 
-      updateTable={updateTable} addCancellation={addCancellation} addSale={addSale}
+      updateTable={updateTable} addCancellation={addCancellation} addSale={addSale} menu={menu}
     />;
   }
 
@@ -301,6 +309,53 @@ function AdminDashboard({ tables, outOfStockItems, appUser, addToast, sales, can
     statsPorGarcom[wName].cancelamentos += (cancel.price || 0);
   });
 
+  // Funções de Gerenciamento de Equipe
+  const handleAddEmployee = () => {
+    if (!newEmp.name.trim() || newEmp.pin.length !== 4) {
+      return addToast("Digite o nome e um PIN exato de 4 números.", "error");
+    }
+    const id = 'emp_' + Date.now().toString(36);
+    setEmployees(prev => [...prev, { id, ...newEmp }]);
+    addToast(`${newEmp.name} cadastrado com sucesso!`, "success");
+    setNewEmp({ name: '', pin: '', role: 'waiter' });
+  };
+
+  const handleRemoveEmployee = (id, name) => {
+    if (id === appUser.id) return addToast("Você não pode remover a si mesmo!", "error");
+    setEmployees(prev => prev.filter(e => e.id !== id));
+    addToast(`${name} removido da equipe.`, "info");
+  };
+
+  // Funções de Gerenciamento de Cardápio
+  const handleAddMenuItem = () => {
+    if (!newMenuItem.name.trim() || !newMenuItem.price || !newMenuItem.subcategory.trim()) {
+      return addToast("Preencha todos os campos do prato.", "error");
+    }
+    const priceNum = parseFloat(newMenuItem.price.replace(',', '.'));
+    if (isNaN(priceNum)) return addToast("Preço inválido.", "error");
+
+    const newItem = {
+      id: 'item_' + Date.now().toString(36),
+      name: newMenuItem.name.trim(),
+      price: priceNum
+    };
+
+    setMenu(prev => {
+      const updatedMenu = { ...prev };
+      const cat = newMenuItem.category;
+      const sub = newMenuItem.subcategory.trim();
+      
+      if (!updatedMenu[cat]) updatedMenu[cat] = {};
+      if (!updatedMenu[cat][sub]) updatedMenu[cat][sub] = [];
+      
+      updatedMenu[cat][sub].push(newItem);
+      return updatedMenu;
+    });
+
+    addToast(`${newItem.name} adicionado ao cardápio e ao estoque!`, "success");
+    setNewMenuItem(prev => ({ ...prev, name: '', price: '' })); // Mantém a categoria para facilitar cadastro múltiplo
+  };
+
   return (
     <div className="flex-1 w-full flex flex-col md:flex-row overflow-hidden bg-gray-100">
       <div className="bg-gray-900 flex md:flex-col overflow-x-auto md:overflow-y-auto md:w-64 shrink-0 shadow-xl z-10 border-t border-gray-800 hide-scrollbar">
@@ -313,6 +368,14 @@ function AdminDashboard({ tables, outOfStockItems, appUser, addToast, sales, can
         <button onClick={() => setActiveTab('estoque')} className={`flex items-center gap-3 p-4 hover:bg-gray-800 font-bold whitespace-nowrap transition-colors ${activeTab === 'estoque' ? 'bg-gray-800 text-blue-400 md:border-l-4 border-b-4 md:border-b-0 border-blue-500' : 'text-gray-400'}`}>
           <Package size={20}/> Estoque Rápido
         </button>
+        <div className="md:mt-auto border-t border-gray-800 flex flex-row md:flex-col shrink-0">
+          <button onClick={() => setActiveTab('cardapio')} className={`flex items-center gap-3 p-4 hover:bg-gray-800 font-bold whitespace-nowrap transition-colors ${activeTab === 'cardapio' ? 'bg-gray-800 text-green-400 md:border-l-4 border-b-4 md:border-b-0 border-green-500' : 'text-gray-400'}`}>
+            <BookOpen size={20}/> Gerir Cardápio
+          </button>
+          <button onClick={() => setActiveTab('equipe')} className={`flex items-center gap-3 p-4 hover:bg-gray-800 font-bold whitespace-nowrap transition-colors ${activeTab === 'equipe' ? 'bg-gray-800 text-purple-400 md:border-l-4 border-b-4 md:border-b-0 border-purple-500' : 'text-gray-400'}`}>
+            <Users size={20}/> Gerir Equipe
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 bg-gray-100 p-4 sm:p-6 overflow-y-auto">
@@ -422,16 +485,16 @@ function AdminDashboard({ tables, outOfStockItems, appUser, addToast, sales, can
           <div className="max-w-3xl">
              <h2 className="text-2xl font-black text-gray-800 mb-6">Controle Rápido de Estoque</h2>
              <div className="bg-white rounded-3xl shadow-sm border border-gray-200 p-6 sm:p-8">
-               {Object.keys(MENU).map(cat => (
+               {Object.keys(menu).map(cat => (
                  <div key={cat} className="mb-8 last:mb-0">
                    <h3 className="font-black text-xl text-gray-800 border-b-2 border-gray-100 pb-2 mb-4 flex items-center gap-2">
                      {cat === 'Comida' ? <Utensils className="text-blue-500"/> : <Wine className="text-purple-500"/>} {cat}
                    </h3>
-                   {Object.keys(MENU[cat]).map(sub => (
+                   {Object.keys(menu[cat]).map(sub => (
                      <div key={sub} className="mb-6 pl-0 sm:pl-4">
                        <h4 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3">{sub}</h4>
                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                         {MENU[cat][sub].map(prod => (
+                         {menu[cat][sub].map(prod => (
                            <div key={prod.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-gray-200 transition-colors">
                              <span className="font-bold text-gray-800">{prod.name}</span>
                              <button
@@ -454,13 +517,139 @@ function AdminDashboard({ tables, outOfStockItems, appUser, addToast, sales, can
              </div>
           </div>
         )}
+
+        {/* NOVA ABA: EQUIPE */}
+        {activeTab === 'equipe' && (
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-2xl font-black text-gray-800 mb-6">Gerenciamento de Equipe</h2>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Formulário de Adição */}
+              <div className="lg:col-span-1 bg-white p-6 rounded-3xl shadow-sm border border-gray-200 h-fit">
+                <h3 className="text-lg font-black text-gray-900 mb-4 flex items-center gap-2"><UserPlus size={20} className="text-blue-600"/> Novo Membro</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Nome do Colaborador</label>
+                    <input 
+                      type="text" value={newEmp.name} onChange={e => setNewEmp({...newEmp, name: e.target.value})}
+                      placeholder="Ex: Carlos" className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">PIN (4 Num)</label>
+                      <input 
+                        type="text" maxLength={4} value={newEmp.pin} onChange={e => setNewEmp({...newEmp, pin: e.target.value.replace(/\D/g, '')})}
+                        placeholder="1234" className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl font-black text-center focus:border-blue-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Cargo</label>
+                      <select 
+                        value={newEmp.role} onChange={e => setNewEmp({...newEmp, role: e.target.value})}
+                        className="w-full p-3 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold text-gray-700 focus:border-blue-500 focus:outline-none"
+                      >
+                        <option value="waiter">Garçom</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button onClick={handleAddEmployee} className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black uppercase text-sm shadow-lg shadow-blue-200 transition-colors mt-2">
+                    Cadastrar Membro
+                  </button>
+                </div>
+              </div>
+
+              {/* Lista Atual */}
+              <div className="lg:col-span-2 bg-white p-6 rounded-3xl shadow-sm border border-gray-200">
+                 <h3 className="text-lg font-black text-gray-900 mb-4 flex items-center gap-2"><Users size={20} className="text-gray-500"/> Equipe Cadastrada</h3>
+                 <div className="space-y-3">
+                   {employees.map(emp => (
+                     <div key={emp.id} className="flex justify-between items-center p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                       <div className="flex flex-col">
+                         <span className="font-black text-gray-900 text-lg">{emp.name}</span>
+                         <div className="flex gap-2 items-center mt-1">
+                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${emp.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                             {emp.role === 'admin' ? 'Administrador' : 'Garçom'}
+                           </span>
+                           <span className="text-[10px] font-bold text-gray-400 bg-gray-200 px-2 py-0.5 rounded-md">PIN: ****</span>
+                         </div>
+                       </div>
+                       {emp.id !== appUser.id && (
+                         <button onClick={() => handleRemoveEmployee(emp.id, emp.name)} className="p-3 text-red-500 hover:bg-red-100 rounded-xl transition-colors">
+                           <Trash2 size={20} />
+                         </button>
+                       )}
+                     </div>
+                   ))}
+                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* NOVA ABA: CARDÁPIO */}
+        {activeTab === 'cardapio' && (
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-2xl font-black text-gray-800 mb-6">Gerenciamento do Cardápio</h2>
+            
+            <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-gray-200 mb-8">
+              <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2"><Plus size={20} className="text-green-600"/> Adicionar Novo Prato / Bebida</h3>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Tipo principal</label>
+                  <select 
+                    value={newMenuItem.category} onChange={e => setNewMenuItem({...newMenuItem, category: e.target.value})}
+                    className="w-full p-3.5 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold focus:border-green-500 focus:outline-none"
+                  >
+                    <option value="Comida">Comida (Cozinha)</option>
+                    <option value="Bebidas">Bebida (Copa/Bar)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Subcategoria</label>
+                  <input 
+                    type="text" value={newMenuItem.subcategory} onChange={e => setNewMenuItem({...newMenuItem, subcategory: e.target.value})}
+                    placeholder="Ex: Sobremesas, Vinhos..." className="w-full p-3.5 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold focus:border-green-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Nome do Item</label>
+                  <input 
+                    type="text" value={newMenuItem.name} onChange={e => setNewMenuItem({...newMenuItem, name: e.target.value})}
+                    placeholder="Ex: Pudim de Leite" className="w-full p-3.5 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold focus:border-green-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Preço (R$)</label>
+                  <input 
+                    type="number" step="0.01" value={newMenuItem.price} onChange={e => setNewMenuItem({...newMenuItem, price: e.target.value})}
+                    placeholder="15.90" className="w-full p-3.5 bg-gray-50 border-2 border-gray-100 rounded-xl font-black text-green-700 focus:border-green-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+              
+              <button onClick={handleAddMenuItem} className="w-full sm:w-auto px-8 py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-black uppercase text-sm shadow-lg shadow-green-200 transition-colors">
+                Salvar no Cardápio
+              </button>
+            </div>
+            
+            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-3">
+              <AlertCircle size={20} className="text-blue-600 shrink-0 mt-0.5" />
+              <p className="text-sm font-bold text-blue-800 leading-tight">
+                Dica: Ao digitar uma subcategoria que não existe (ex: "Sobremesas"), o sistema criará essa nova aba automaticamente no celular dos garçons. Os itens adicionados aqui aparecem instantaneamente na tela de todos.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 // --- VISÃO DA MESA (PEDIDOS) ---
-function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast, updateTable, addCancellation, addSale }) {
+function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast, updateTable, addCancellation, addSale, menu }) {
   const [menuPath, setMenuPath] = useState([]);
   const [localOrder, setLocalOrder] = useState(table.currentOrder ? { ...table.currentOrder } : { items: [], total: 0 });
   const [checkoutModal, setCheckoutModal] = useState(table.status === 'closing' && appUser.role === 'admin');
@@ -471,9 +660,9 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
   const isClosing = table.status === 'closing';
 
   const getCurrentMenuLevel = () => {
-    if (menuPath.length === 0) return Object.keys(MENU);
-    if (menuPath.length === 1) return Object.keys(MENU[menuPath[0]]);
-    if (menuPath.length === 2) return MENU[menuPath[0]][menuPath[1]];
+    if (menuPath.length === 0) return Object.keys(menu);
+    if (menuPath.length === 1) return Object.keys(menu[menuPath[0]] || {});
+    if (menuPath.length === 2) return menu[menuPath[0]][menuPath[1]] || [];
     return [];
   };
 
@@ -650,23 +839,14 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
         </div>
       </div>
 
-      {/* OVERLAY ESCURO PARA CELULAR CUANDO A COMANDA ESTÁ ABERTA */}
       {isMobileSheetOpen && (
-        <div 
-          onClick={() => setIsMobileSheetOpen(false)}
-          className="fixed inset-0 bg-black/50 z-20 md:hidden animate-fade-in backdrop-blur-xs"
-        />
+        <div onClick={() => setIsMobileSheetOpen(false)} className="fixed inset-0 bg-black/50 z-20 md:hidden animate-fade-in backdrop-blur-xs" />
       )}
 
-      {/* COMANDA COM GAVETA DESLIZANTE NO MOBILE */}
       <div className={`w-full md:w-96 bg-white flex flex-col fixed md:relative bottom-0 left-0 right-0 z-30 transition-all duration-300 ease-in-out md:translate-y-0 rounded-t-3xl md:rounded-none md:h-full shadow-[0_-10px_30px_rgba(0,0,0,0.2)] md:shadow-none ${
         isMobileSheetOpen ? 'h-[80vh] translate-y-0' : 'h-16 translate-y-0 md:h-full'
       }`}>
-        {/* CABEÇALHO DA COMANDA (CLICÁVEL NO CELULAR PARA ABRIR/FECHAR) */}
-        <div 
-          onClick={() => setIsMobileSheetOpen(prev => !prev)}
-          className="p-4 bg-gray-900 text-white flex justify-between items-center shrink-0 rounded-t-3xl md:rounded-none cursor-pointer select-none"
-        >
+        <div onClick={() => setIsMobileSheetOpen(prev => !prev)} className="p-4 bg-gray-900 text-white flex justify-between items-center shrink-0 rounded-t-3xl md:rounded-none cursor-pointer select-none">
           <div className="flex items-center gap-2">
             <div className="w-8 h-1 bg-gray-600 rounded-full absolute top-2 left-1/2 -translate-x-1/2 md:hidden" />
             <FileText size={18} className="text-blue-400"/>
@@ -687,7 +867,6 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
           </div>
         </div>
         
-        {/* CORPO DA COMANDA */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
            {localOrder.items.length === 0 ? (
              <div className="h-full flex flex-col items-center justify-center text-gray-400 gap-3 opacity-50 py-8">
@@ -715,7 +894,6 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
            )}
         </div>
 
-        {/* RODAPÉ E BOTÕES DE AÇÃO */}
         <div className="p-4 bg-white border-t border-gray-100 shrink-0 pb-safe">
           {pendingCount > 0 ? (
             <button onClick={saveOrder} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-200 flex items-center justify-center gap-2 hover:bg-blue-700 active:scale-95 transition-all text-base sm:text-lg">
@@ -733,7 +911,6 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
         </div>
       </div>
 
-      {/* MODAL 1: JUSTIFICATIVA DE CANCELAMENTO (GARÇOM) */}
       {cancelModalItem && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-3xl w-full max-w-md p-6 sm:p-8 shadow-2xl transform transition-all scale-100">
@@ -756,7 +933,6 @@ function TableOrderView({ table, appUser, onBack, outOfStockItems = {}, addToast
         </div>
       )}
 
-      {/* MODAL 2: FECHAMENTO DE CONTA & LIBERAÇÃO (ADMIN) */}
       {checkoutModal && appUser.role === 'admin' && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white rounded-3xl w-full max-w-sm p-6 sm:p-8 shadow-2xl">
