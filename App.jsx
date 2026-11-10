@@ -272,6 +272,7 @@ function AdminDashboard({ tables, outOfStockItems, appUser, addToast, sales, can
   // Estados dos novos formulários
   const [newEmp, setNewEmp] = useState({ name: '', pin: '', role: 'waiter' });
   const [newMenuItem, setNewMenuItem] = useState({ name: '', price: '', category: 'Comida', subcategory: '' });
+  const [isNewSubcategory, setIsNewSubcategory] = useState(false);
 
   if (activeTable) {
     return <TableOrderView 
@@ -328,8 +329,11 @@ function AdminDashboard({ tables, outOfStockItems, appUser, addToast, sales, can
 
   // Funções de Gerenciamento de Cardápio
   const handleAddMenuItem = () => {
-    if (!newMenuItem.name.trim() || !newMenuItem.price || !newMenuItem.subcategory.trim()) {
+    if (!newMenuItem.name.trim() || !newMenuItem.price || (!newMenuItem.subcategory.trim() && isNewSubcategory)) {
       return addToast("Preencha todos os campos do prato.", "error");
+    }
+    if (!newMenuItem.subcategory && !isNewSubcategory) {
+      return addToast("Selecione uma subcategoria ou crie uma nova.", "error");
     }
     const priceNum = parseFloat(newMenuItem.price.replace(',', '.'));
     if (isNaN(priceNum)) return addToast("Preço inválido.", "error");
@@ -353,8 +357,25 @@ function AdminDashboard({ tables, outOfStockItems, appUser, addToast, sales, can
     });
 
     addToast(`${newItem.name} adicionado ao cardápio e ao estoque!`, "success");
-    setNewMenuItem(prev => ({ ...prev, name: '', price: '' })); // Mantém a categoria para facilitar cadastro múltiplo
+    setNewMenuItem(prev => ({ ...prev, name: '', price: '', subcategory: '' })); 
+    setIsNewSubcategory(false);
   };
+
+  const handleDeleteMenuItem = (category, subcategory, itemId, itemName) => {
+    setMenu(prev => {
+      const updatedMenu = { ...prev };
+      updatedMenu[category][subcategory] = updatedMenu[category][subcategory].filter(item => item.id !== itemId);
+      
+      // Limpa a aba de subcategoria se ela ficar vazia (ex: sem pratos)
+      if (updatedMenu[category][subcategory].length === 0) {
+        delete updatedMenu[category][subcategory];
+      }
+      return updatedMenu;
+    });
+    addToast(`${itemName} removido do cardápio e estoque.`, "info");
+  };
+
+  const currentSubcategories = Object.keys(menu[newMenuItem.category] || {});
 
   return (
     <div className="flex-1 w-full flex flex-col md:flex-row overflow-hidden bg-gray-100">
@@ -593,6 +614,7 @@ function AdminDashboard({ tables, outOfStockItems, appUser, addToast, sales, can
           <div className="max-w-4xl mx-auto">
             <h2 className="text-2xl font-black text-gray-800 mb-6">Gerenciamento do Cardápio</h2>
             
+            {/* FORMULÁRIO DE ADIÇÃO */}
             <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-gray-200 mb-8">
               <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2"><Plus size={20} className="text-green-600"/> Adicionar Novo Prato / Bebida</h3>
               
@@ -600,7 +622,7 @@ function AdminDashboard({ tables, outOfStockItems, appUser, addToast, sales, can
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Tipo principal</label>
                   <select 
-                    value={newMenuItem.category} onChange={e => setNewMenuItem({...newMenuItem, category: e.target.value})}
+                    value={newMenuItem.category} onChange={e => { setNewMenuItem({...newMenuItem, category: e.target.value, subcategory: ''}); setIsNewSubcategory(false); }}
                     className="w-full p-3.5 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold focus:border-green-500 focus:outline-none"
                   >
                     <option value="Comida">Comida (Cozinha)</option>
@@ -608,11 +630,36 @@ function AdminDashboard({ tables, outOfStockItems, appUser, addToast, sales, can
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Subcategoria</label>
-                  <input 
-                    type="text" value={newMenuItem.subcategory} onChange={e => setNewMenuItem({...newMenuItem, subcategory: e.target.value})}
-                    placeholder="Ex: Sobremesas, Vinhos..." className="w-full p-3.5 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold focus:border-green-500 focus:outline-none"
-                  />
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 flex justify-between items-center">
+                    Subcategoria
+                    {isNewSubcategory && <button onClick={() => { setIsNewSubcategory(false); setNewMenuItem({...newMenuItem, subcategory: ''}); }} className="text-[10px] text-blue-500 hover:underline normal-case">Voltar à lista</button>}
+                  </label>
+                  
+                  {!isNewSubcategory ? (
+                    <select 
+                      value={newMenuItem.subcategory} 
+                      onChange={e => {
+                        if (e.target.value === 'NEW') {
+                          setIsNewSubcategory(true);
+                          setNewMenuItem({...newMenuItem, subcategory: ''});
+                        } else {
+                          setNewMenuItem({...newMenuItem, subcategory: e.target.value});
+                        }
+                      }}
+                      className="w-full p-3.5 bg-gray-50 border-2 border-gray-100 rounded-xl font-bold focus:border-green-500 focus:outline-none"
+                    >
+                      <option value="" disabled>Selecione...</option>
+                      {currentSubcategories.map(sub => (
+                        <option key={sub} value={sub}>{sub}</option>
+                      ))}
+                      <option value="NEW" className="font-black text-green-600">+ Criar Nova...</option>
+                    </select>
+                  ) : (
+                    <input 
+                      type="text" value={newMenuItem.subcategory} onChange={e => setNewMenuItem({...newMenuItem, subcategory: e.target.value})}
+                      placeholder="Nome da nova..." autoFocus className="w-full p-3.5 bg-gray-50 border-2 border-green-300 rounded-xl font-bold focus:border-green-500 focus:outline-none"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Nome do Item</label>
@@ -635,12 +682,41 @@ function AdminDashboard({ tables, outOfStockItems, appUser, addToast, sales, can
               </button>
             </div>
             
-            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-3">
-              <AlertCircle size={20} className="text-blue-600 shrink-0 mt-0.5" />
-              <p className="text-sm font-bold text-blue-800 leading-tight">
-                Dica: Ao digitar uma subcategoria que não existe (ex: "Sobremesas"), o sistema criará essa nova aba automaticamente no celular dos garçons. Os itens adicionados aqui aparecem instantaneamente na tela de todos.
-              </p>
+            {/* LISTAGEM DE ITENS PARA EXCLUSÃO */}
+            <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-gray-200">
+              <h3 className="text-lg font-black text-gray-900 mb-6 flex items-center gap-2"><BookOpen size={20} className="text-gray-500"/> Cardápio Atual (Remover)</h3>
+              
+              {Object.keys(menu).map(cat => (
+                <div key={cat} className="mb-8 last:mb-0">
+                  <h4 className="font-black text-xl text-gray-800 border-b-2 border-gray-100 pb-2 mb-4 flex items-center gap-2">
+                    {cat === 'Comida' ? <Utensils className="text-blue-500"/> : <Wine className="text-purple-500"/>} {cat}
+                  </h4>
+                  {Object.keys(menu[cat]).map(sub => (
+                    <div key={sub} className="mb-6 pl-0 sm:pl-4">
+                      <h5 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-3">{sub}</h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {menu[cat][sub].map(prod => (
+                          <div key={prod.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-red-200 transition-colors group">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-gray-800 leading-tight">{prod.name}</span>
+                              <span className="text-green-600 font-black text-sm">R$ {prod.price.toFixed(2)}</span>
+                            </div>
+                            <button
+                              onClick={() => handleDeleteMenuItem(cat, sub, prod.id, prod.name)}
+                              className="p-3 text-red-400 hover:text-white hover:bg-red-500 rounded-xl transition-all"
+                              title="Excluir Item"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
+
           </div>
         )}
       </div>
